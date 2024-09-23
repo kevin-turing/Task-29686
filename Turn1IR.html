@@ -1,1 +1,409 @@
-T1IR
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Elemental Quest</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #1a1a2e;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #gameContainer {
+            text-align: center;
+            max-width: 800px;
+            width: 100%;
+            position: relative;
+        }
+        #gameArea, #tutorialArea {
+            background-color: #16213e;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            margin-top: 20px;
+        }
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(9, 50px);
+            gap: 3px;
+            margin: 20px auto;
+        }
+        .cell {
+            width: 50px;
+            height: 50px;
+            line-height: 50px;
+            font-size: 24px;
+            background: #0f3460;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .cell:hover {
+            transform: scale(1.1);
+        }
+        .avatar {
+            background: #e94560;
+            animation: pulse 2s infinite;
+        }
+        .gem {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            font-size: 16px;
+            z-index: 2;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        #menu, #gameControls {
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            background-color: #e94560;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            background-color: #ff6b6b;
+            transform: translateY(-2px);
+        }
+        #status {
+            background-color: #0f3460;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        h1 {
+            color: #e94560;
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+        h2 {
+            color: #e94560;
+        }
+        #tutorialArea {
+            text-align: left;
+        }
+        #tutorialArea ul {
+            padding-left: 20px;
+        }
+        #tutorialArea li {
+            margin-bottom: 10px;
+        }
+        #notificationArea {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 250px;
+            z-index: 1000;
+        }
+        .notification {
+            background-color: rgba(15, 52, 96, 0.9);
+            border-left: 4px solid #e94560;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            opacity: 0;
+            transform: translateX(100%);
+            transition: opacity 0.3s, transform 0.3s;
+        }
+        .notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    </style>
+</head>
+<body>
+<div id="gameContainer">
+    <h1>Elemental Quest</h1>
+    <div id="menu">
+        <button onclick="showTutorial()">Tutorial</button>
+        <button onclick="startGame('easy')">Start Easy</button>
+        <button onclick="startGame('hard')">Start Hard</button>
+    </div>
+    <div id="tutorialArea" style="display: none;">
+        <h2>How to Play Elemental Quest</h2>
+        <ul>
+            <li><strong>Objective:</strong> Collect all gems while maintaining health and maximizing points.</li>
+            <li><strong>Grid:</strong> Navigate a 9x9 grid where tiles change elements (🔥 Fire, 💧 Water, 🌍 Earth, 🌪️ Air) every turn.</li>
+            <li><strong>Movement:</strong> Use arrow keys or click adjacent cells to move your avatar (🧙).</li>
+            <li><strong>Gems:</strong> Collect elemental gems (💎) by stepping on tiles that match your current element.</li>
+            <li><strong>Scoring:</strong>
+                <ul>
+                    <li>Collect a gem: +10 points</li>
+                    <li>Step on a matching element: +5 points</li>
+                    <li>Step on a non-matching element: -10 health</li>
+                </ul>
+            </li>
+            <li><strong>Element Change:</strong> Use the "Change Element" button to switch your element. You have limited transformation tokens.</li>
+            <li><strong>Difficulty:</strong>
+                <ul>
+                    <li>Easy: More health, more tokens, slower element changes</li>
+                    <li>Hard: Less health, fewer tokens, faster element changes</li>
+                </ul>
+            </li>
+            <li><strong>Game Over:</strong> The game ends when you collect all gems (win) or your health reaches zero (lose).</li>
+        </ul>
+        <button onclick="hideTutorial()">Back to Menu</button>
+    </div>
+    <div id="gameArea" style="display: none;">
+        <div id="status"></div>
+        <div id="grid"></div>
+        <div id="gameControls">
+            <button onclick="changeElement()">Change Element</button>
+            <button onclick="endGameEarly()">End Game</button>
+        </div>
+    </div>
+</div>
+<div id="notificationArea"></div>
+
+<script>
+let grid = [];
+const size = 9;
+let avatar = {x: 4, y: 4, element: '🔥', health: 100, points: 0, tokens: 3};
+const elements = ['🔥', '💧', '🌍', '🌪️'];
+let gems = 10;
+let gameInterval;
+let difficulty;
+let isGameOver = false;
+
+function createGrid() {
+    const gridDiv = document.getElementById('grid');
+    gridDiv.innerHTML = '';
+    for(let y = 0; y < size; y++) {
+        for(let x = 0; x < size; x++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.id = `cell-${x}-${y}`;
+            cell.onclick = () => handleCellClick(x, y);
+            gridDiv.appendChild(cell);
+            grid.push({x, y, element: elements[Math.floor(Math.random() * elements.length)], hasGem: false});
+        }
+    }
+    updateGrid();
+    placeAvatar();
+    placeGems();
+}
+
+function updateGrid() {
+    grid.forEach(cell => {
+        const cellElement = document.getElementById(`cell-${cell.x}-${cell.y}`);
+        cellElement.textContent = cell.element;
+        if (cell.hasGem) {
+            let gemSpan = cellElement.querySelector('.gem');
+            if (!gemSpan) {
+                gemSpan = document.createElement('span');
+                gemSpan.className = 'gem';
+                gemSpan.textContent = '💎';
+                cellElement.appendChild(gemSpan);
+            }
+        }
+    });
+}
+
+function placeAvatar() {
+    const avatarCell = document.getElementById(`cell-${avatar.x}-${avatar.y}`);
+    avatarCell.classList.add('avatar');
+    avatarCell.textContent = '🧙' + avatarCell.textContent;
+}
+
+function placeGems() {
+    for(let i = 0; i < gems;) {
+        let x = Math.floor(Math.random() * size);
+        let y = Math.floor(Math.random() * size);
+        let cell = grid.find(c => c.x === x && c.y === y);
+        if((x !== avatar.x || y !== avatar.y) && !cell.hasGem) {
+            cell.hasGem = true;
+            i++;
+        }
+    }
+    updateGrid();
+}
+
+function handleCellClick(x, y) {
+    if (Math.abs(x - avatar.x) + Math.abs(y - avatar.y) === 1) {
+        moveAvatar(x - avatar.x, y - avatar.y);
+    }
+}
+
+function moveAvatar(dx, dy) {
+    if (isGameOver) return;
+    let newX = avatar.x + dx;
+    let newY = avatar.y + dy;
+    if (newX >= 0 && newX < size && newY >= 0 && newY < size) {
+        const oldCell = document.getElementById(`cell-${avatar.x}-${avatar.y}`);
+        const newCell = document.getElementById(`cell-${newX}-${newY}`);
+        
+        oldCell.classList.remove('avatar');
+        oldCell.textContent = oldCell.textContent.replace('🧙', '');
+        
+        avatar.x = newX;
+        avatar.y = newY;
+        
+        placeAvatar();
+        checkElementMatch();
+        
+        let newCellData = grid.find(c => c.x === newX && c.y === newY);
+        if(newCellData.hasGem) {
+            collectGem(newX, newY);
+        }
+        
+        changeElements();
+        if(gems === 0) endGame(true);
+    }
+}
+
+function collectGem(x, y) {
+    let cell = grid.find(c => c.x === x && c.y === y);
+    cell.hasGem = false;
+    const cellElement = document.getElementById(`cell-${x}-${y}`);
+    const gemSpan = cellElement.querySelector('.gem');
+    if (gemSpan) {
+        cellElement.removeChild(gemSpan);
+    }
+    gems--;
+    avatar.points += 10;
+    showNotification(`Gem collected! +10 points`);
+    updateStatus();
+}
+
+function checkElementMatch() {
+    let currentCell = grid.find(c => c.x === avatar.x && c.y === avatar.y);
+    if(currentCell.element === avatar.element) {
+        avatar.points += 5;
+        showNotification(`Element match! +5 points`);
+    } else {
+        avatar.health -= 10;
+        showNotification(`Element mismatch! -10 health`);
+        if(avatar.health <= 0) endGame(false);
+    }
+    updateStatus();
+}
+
+function updateStatus() {
+    document.getElementById('status').innerHTML = 
+        `Health: ${avatar.health} | Points: ${avatar.points} | Tokens: ${avatar.tokens} | Gems Left: ${gems} | Element: ${avatar.element}`;
+}
+
+function changeElement() {
+    if (isGameOver) return;
+    if(avatar.tokens > 0) {
+        avatar.element = elements[(elements.indexOf(avatar.element) + 1) % elements.length];
+        avatar.tokens--;
+        showNotification(`Element changed to ${avatar.element}`);
+        updateStatus();
+    } else {
+        showNotification("No more transformation tokens!");
+    }
+}
+
+function startGame(diff) {
+    difficulty = diff;
+    isGameOver = false;
+    avatar = {
+        x: 4, y: 4, 
+        element: '🔥', 
+        health: difficulty === 'easy' ? 150 : 100, 
+        points: 0, 
+        tokens: difficulty === 'easy' ? 5 : 3
+    };
+    gems = 10;
+    createGrid();
+    updateStatus();
+    document.getElementById('gameArea').style.display = 'block';
+    document.getElementById('menu').style.display = 'none';
+    document.getElementById('tutorialArea').style.display = 'none';
+    document.addEventListener('keydown', handleKeyPress);
+    showNotification(`Game started in ${difficulty} mode. Good luck!`);
+}
+
+function changeElements() {
+    grid.forEach(cell => {
+        if(cell.x !== avatar.x || cell.y !== avatar.y) {
+            cell.element = elements[Math.floor(Math.random() * elements.length)];
+        }
+    });
+    updateGrid();
+    placeAvatar();
+}
+
+function endGame(won) {
+    isGameOver = true;
+    document.removeEventListener('keydown', handleKeyPress);
+    if (won) {
+        showNotification(`Congratulations! You won!\nFinal Score: ${avatar.points}`);
+    } else {
+        showNotification(`Game Over! Your health reached zero.\nFinal Score: ${avatar.points}`);
+    }
+    setTimeout(() => {
+        document.getElementById('menu').style.display = 'block';
+        document.getElementById('gameArea').style.display = 'none';
+    }, 3000);
+}
+
+function handleKeyPress(e) {
+    switch(e.key) {
+        case 'ArrowUp': moveAvatar(0, -1); break;
+        case 'ArrowDown': moveAvatar(0, 1); break;
+        case 'ArrowLeft': moveAvatar(-1, 0); break;
+        case 'ArrowRight': moveAvatar(1, 0); break;
+    }
+}
+
+function showTutorial() {
+    document.getElementById('tutorialArea').style.display = 'block';
+    document.getElementById('menu').style.display = 'none';
+    document.getElementById('gameArea').style.display = 'none';
+}
+
+function hideTutorial() {
+    document.getElementById('tutorialArea').style.display = 'none';
+    document.getElementById('menu').style.display = 'block';
+}
+
+function showNotification(message) {
+    const notificationArea = document.getElementById('notificationArea');
+    const notification = document.createElement('div');
+    notification.className = 'notification';
+    notification.textContent = message;
+    notificationArea.appendChild(notification);
+    
+    // Trigger reflow
+    notification.offsetHeight;
+    
+    notification.classList.add('show');
+    
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => {
+            notificationArea.removeChild(notification);
+        }, 300);
+    }, 3000);
+}
+
+function endGameEarly() {
+    if (confirm("Are you sure you want to end the game?")) {
+        endGame(false);
+    }
+}
+
+document.getElementById('gameArea').style.display = 'none';
+document.getElementById('tutorialArea').style.display = 'none';
+</script>
+</body>
+</html>

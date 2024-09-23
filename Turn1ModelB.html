@@ -1,1 +1,119 @@
-T1MB
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Elemental Quest</title>
+<style>
+    body { font-family: 'Arial', sans-serif; text-align: center; }
+    #gameBoard { display: grid; grid-template-columns: repeat(9, 30px); gap: 2px; margin: 20px auto; }
+    .tile { width: 30px; height: 30px; background: #eee; line-height: 30px; font-size: 20px; }
+    #avatar { font-size: 20px; }
+    #menu { margin: 20px; }
+    .element { font-weight: bold; }
+    .fire { color: red; }
+    .water { color: blue; }
+    .earth { color: green; }
+    .air { color: lightblue; }
+</style>
+</head>
+<body>
+
+<div id="menu">
+    <select id="difficulty">
+        <option value="easy">Easy</option>
+        <option value="medium">Medium</option>
+        <option value="hard">Hard</option>
+    </select>
+    <button onclick="startGame()">Start Game</button>
+</div>
+
+<div id="gameInfo">
+    <div>Health: <span id="health">100</span></div>
+    <div>Points: <span id="points">0</span></div>
+    <div>Tokens: <span id="tokens">5</span></div>
+    <div id="avatar" class="element">🔥</div>
+</div>
+
+<div id="gameBoard"></div>
+
+<script>
+    const board = document.getElementById('gameBoard');
+    const elements = ['🔥', '💧', '🌱', '💨'];
+    let gameState = {
+        avatarElement: 0,
+        playerPosition: {x: 4, y: 4},
+        health: 100,
+        points: 0,
+        tokens: 5,
+        gems: 10,
+        difficulty: 'medium'
+    };
+
+    function createBoard() {
+        for(let i = 0; i < 81; i++) {
+            let tile = document.createElement('div');
+            tile.className = 'tile';
+            tile.textContent = elements[Math.floor(Math.random() * elements.length)];
+            tile.onclick = () => movePlayer(i);
+            board.appendChild(tile);
+        }
+    }
+
+    function changeElement() {
+        if(gameState.tokens > 0) {
+            gameState.avatarElement = (gameState.avatarElement + 1) % elements.length;
+            gameState.tokens--;
+            updateDisplay();
+        }
+    }
+
+    function movePlayer(index) {
+        const x = index % 9;
+        const y = Math.floor(index / 9);
+        if(Math.abs(x - gameState.playerPosition.x) + Math.abs(y - gameState.playerPosition.y) === 1) {
+            gameState.playerPosition = {x, y};
+            const currentTile = board.children[index];
+            if(currentTile.textContent === elements[gameState.avatarElement]) {
+                gameState.points += 10;
+                gameState.gems--;
+                currentTile.textContent = ''; // Collect gem
+            } else {
+                gameState.health -= 10;
+            }
+            updateDisplay();
+            if(gameState.gems === 0 || gameState.health <= 0) endGame();
+            changeBoardElements();
+        }
+    }
+
+    function changeBoardElements() {
+        for(let tile of board.children) {
+            if(tile.textContent !== '') tile.textContent = elements[Math.floor(Math.random() * elements.length)];
+        }
+    }
+
+    function updateDisplay() {
+        document.getElementById('avatar').textContent = elements[gameState.avatarElement];
+        document.getElementById('avatar').className = `element ${elements[gameState.avatarElement].substr(1, 1)}`;
+        document.getElementById('health').textContent = gameState.health;
+        document.getElementById('points').textContent = gameState.points;
+        document.getElementById('tokens').textContent = gameState.tokens;
+    }
+
+    function startGame() {
+        gameState.difficulty = document.getElementById('difficulty').value;
+        gameState.tokens = {'easy': 7, 'medium': 5, 'hard': 3}[gameState.difficulty];
+        gameState.health = {'easy': 120, 'medium': 100, 'hard': 80}[gameState.difficulty];
+        createBoard();
+        updateDisplay();
+        document.getElementById('menu').style.display = 'none';
+    }
+
+    function endGame() {
+        alert(gameState.health > 0 ? `You Win! Final Score: ${gameState.points}` : 'Game Over!');
+        location.reload();
+    }
+</script>
+
+</body>
+</html>
